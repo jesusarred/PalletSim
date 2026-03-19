@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PalletSim 3D</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg:#0f1117; --panel:#161b27; --border:#252d3d;
+  --amber:#f5a623; --amber-dim:#c4841a;
+  --text:#e8eaf0; --muted:#6b7a99;
+  --green:#2dd4bf; --red:#f87171;
+}
+body { background:var(--bg); color:var(--text); font-family:'DM Mono',monospace; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+header {
+  padding:12px 20px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:12px; flex-shrink:0;
+  background:linear-gradient(90deg,var(--panel),var(--bg));
+}
+header h1 { font-family:'Syne',sans-serif; font-weight:800; font-size:1.25rem; letter-spacing:-0.02em; }
+header .tag {
+  background:var(--amber); color:#000;
+  font-size:0.6rem; font-weight:600; padding:2px 8px;
+  border-radius:3px; letter-spacing:0.07em; text-transform:uppercase;
+}
+header .sub { font-size:0.7rem; color:var(--muted); margin-left:auto; }
+
+.main { display:flex; flex:1; overflow:hidden; }
+
+/* ─── Sidebar ─── */
+.sidebar {
+  width:270px; min-width:270px; background:var(--panel);
+  border-right:1px solid var(--border); padding:16px;
+  overflow-y:auto; display:flex; flex-direction:column; gap:16px;
+}
+.sec-title {
+  font-family:'Syne',sans-serif; font-size:0.62rem; font-weight:700;
+  letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:8px;
+}
+.unit-toggle {
+  display:flex; background:var(--bg); border-radius:6px;
+  padding:3px; border:1px solid var(--border);
+}
+.unit-toggle button {
+  flex:1; padding:6px; border:none; background:transparent;
+  color:var(--muted); font-family:'DM Mono',monospace; font-size:0.8rem;
+  cursor:pointer; border-radius:4px; transition:all .15s;
+}
+.unit-toggle button.active { background:var(--amber); color:#000; font-weight:500; }
+
+.input-group { display:flex; flex-direction:column; gap:7px; }
+.input-row { display:flex; align-items:center; gap:7px; }
+.lbl-dim {
+  width:16px; text-align:center; font-size:0.72rem;
+  color:var(--amber); font-weight:500; flex-shrink:0;
+}
+.lbl-unit { font-size:0.67rem; color:var(--muted); white-space:nowrap; flex-shrink:0; }
+input[type="number"] {
+  flex:1; background:var(--bg); border:1px solid var(--border);
+  color:var(--text); padding:7px 10px; border-radius:5px;
+  font-family:'DM Mono',monospace; font-size:0.82rem; outline:none;
+  transition:border-color .15s; min-width:0;
+}
+input[type="number"]:focus { border-color:var(--amber); }
+input[type="text"]:focus { border-color:var(--amber); outline:none; }
+input[type="number"]::-webkit-inner-spin-button { opacity:.4; }
+input[type="number"]::placeholder { color:var(--muted); opacity:.7; }
+input[type="text"]::placeholder { color:var(--muted); opacity:.7; }
+
+.pallet-info {
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:6px; padding:10px 12px; font-size:0.73rem;
+  color:var(--muted); line-height:1.9;
+}
+.pallet-info strong { color:var(--amber); }
+
+.hint-text { font-size:0.63rem; color:var(--muted); }
+
+.btn-simulate {
+  width:100%; padding:11px; background:var(--amber); color:#000;
+  border:none; border-radius:6px; font-family:'Syne',sans-serif;
+  font-size:0.88rem; font-weight:700; cursor:pointer;
+  letter-spacing:0.03em; transition:all .15s;
+}
+.btn-simulate:hover { background:var(--amber-dim); transform:translateY(-1px); }
+.btn-simulate:active { transform:translateY(0); }
+
+.stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+.stat-card {
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:6px; padding:9px; text-align:center;
+}
+.stat-val {
+  font-family:'Syne',sans-serif; font-size:1.35rem;
+  font-weight:800; color:var(--amber); display:block;
+}
+.stat-lbl { font-size:0.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.07em; }
+
+/* ─── Canvas ─── */
+.canvas-area { flex:1; position:relative; overflow:hidden; }
+#three-canvas { width:100%; height:100%; display:block; cursor:grab; }
+#three-canvas:active { cursor:grabbing; }
+.canvas-hint {
+  position:absolute; top:14px; left:50%; transform:translateX(-50%);
+  background:rgba(15,17,23,0.85); border:1px solid var(--border);
+  padding:5px 14px; border-radius:20px; font-size:0.62rem; color:var(--muted);
+  pointer-events:none; white-space:nowrap;
+}
+.empty-msg {
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  text-align:center; pointer-events:none;
+}
+.empty-msg .big { font-family:'Syne',sans-serif; font-size:2.5rem; font-weight:800; color:var(--border); }
+.empty-msg .sm { font-size:0.72rem; color:var(--muted); margin-top:6px; }
+
+/* ─── Compare bar ─── */
+.compare-bar {
+  background:var(--panel); border-top:1px solid var(--border);
+  padding:6px 12px; display:flex; gap:8px; align-items:stretch; flex-shrink:0;
+}
+.cmp-card {
+  flex:1; background:var(--bg); border:1px solid var(--border);
+  border-radius:7px; padding:7px 12px; cursor:pointer;
+  transition:all .15s; position:relative; min-width:0;
+}
+.cmp-card:hover { border-color:var(--amber); }
+.cmp-card.active { border-color:var(--amber); }
+.cmp-card.active::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background:var(--amber); border-radius:7px 7px 0 0;
+}
+.cmp-lbl { font-size:0.55rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.07em; }
+.cmp-big { font-family:'Syne',sans-serif; font-size:1.25rem; font-weight:800; color:var(--amber); line-height:1.1; }
+.cmp-sub { font-size:0.58rem; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cmp-name { font-family:'Syne',sans-serif; font-size:0.7rem; font-weight:700; margin-top:2px; }
+.best-badge {
+  position:absolute; top:5px; right:7px;
+  background:var(--green); color:#000; font-size:0.5rem; font-weight:700;
+  padding:2px 5px; border-radius:3px; text-transform:uppercase; letter-spacing:0.06em;
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+/* ─── Pallet type toggle ─── */
+.pallet-type-toggle {
+  display:flex; background:var(--bg); border-radius:6px;
+  padding:3px; border:1px solid var(--border); margin-bottom:10px;
+}
+.pallet-type-toggle button {
+  flex:1; padding:7px 4px; border:none; background:transparent;
+  color:var(--muted); font-family:'DM Mono',monospace; font-size:0.75rem;
+  cursor:pointer; border-radius:4px; transition:all .15s; line-height:1.2;
+}
+.pallet-type-toggle button.active { background:var(--amber); color:#000; font-weight:500; }
+
+.custom-pallet-fields { display:none; flex-direction:column; gap:7px; animation: fadeIn .2s ease; }
+.custom-pallet-fields.visible { display:flex; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+
+/* ─── Feedback chip on config cards ─── */
+.cmp-feedback {
+  display:inline-flex; align-items:center; gap:3px;
+  font-size:0.53rem; font-weight:600; padding:2px 6px;
+  border-radius:3px; margin-top:3px; letter-spacing:0.04em;
+  text-transform:uppercase; white-space:nowrap;
+}
+.feedback-good   { background:rgba(45,212,191,0.15); color:#2dd4bf; border:1px solid rgba(45,212,191,0.3); }
+.feedback-ok     { background:rgba(245,166,35,0.12); color:#f5a623; border:1px solid rgba(245,166,35,0.3); }
+.feedback-warn   { background:rgba(248,113,113,0.12); color:#f87171; border:1px solid rgba(248,113,113,0.3); }
+
+/* ─── Competitor VS panel ─── */
+.vs-section { border-top:1px solid var(--border); padding-top:14px; }
+.vs-tag {
+  display:inline-flex; align-items:center; gap:5px;
+  background:rgba(99,102,241,0.12); color:#a5b4fc;
+  border:1px solid rgba(99,102,241,0.25);
+  font-size:0.58rem; font-weight:700; padding:2px 8px;
+  border-radius:3px; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:10px;
+}
+.vs-overlay {
+  display:none; position:absolute; bottom:50px; right:14px;
+  background:rgba(15,17,23,0.96); border:1px solid #363d52;
+  border-radius:12px; overflow:hidden; min-width:310px;
+  backdrop-filter:blur(8px); box-shadow:0 8px 32px rgba(0,0,0,0.5);
+  animation: fadeIn .25s ease;
+}
+.vs-overlay.visible { display:block; }
+.vs-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 14px; background:rgba(99,102,241,0.1);
+  border-bottom:1px solid #363d52;
+}
+.vs-header-title {
+  font-family:'Syne',sans-serif; font-size:0.75rem; font-weight:800;
+  letter-spacing:0.04em; text-transform:uppercase;
+}
+.vs-close {
+  background:none; border:none; color:var(--muted); cursor:pointer;
+  font-size:1rem; line-height:1; padding:0 2px;
+}
+.vs-close:hover { color:var(--text); }
+.vs-grid {
+  display:grid; grid-template-columns:1fr auto 1fr;
+  gap:0; align-items:center;
+}
+.vs-col {
+  padding:12px 14px; display:flex; flex-direction:column; gap:10px;
+}
+.vs-col.you { border-right:1px solid #363d52; }
+.vs-col.them { }
+.vs-col-header {
+  font-family:'Syne',sans-serif; font-size:0.62rem; font-weight:800;
+  text-transform:uppercase; letter-spacing:0.08em; margin-bottom:2px;
+}
+.vs-col.you .vs-col-header { color:var(--amber); }
+.vs-col.them .vs-col-header { color:#a5b4fc; }
+.vs-divider {
+  display:flex; flex-direction:column; align-items:center;
+  padding:12px 0; gap:6px;
+}
+.vs-vs {
+  font-family:'Syne',sans-serif; font-size:0.65rem; font-weight:800;
+  color:var(--muted); letter-spacing:0.1em;
+}
+.vs-metric { display:flex; flex-direction:column; gap:1px; }
+.vs-metric-val {
+  font-family:'Syne',sans-serif; font-size:1.3rem; font-weight:800; line-height:1;
+}
+.vs-metric-val.win { color:var(--green); }
+.vs-metric-val.lose { color:#f87171; }
+.vs-metric-val.tie { color:var(--amber); }
+.vs-metric-lbl { font-size:0.56rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; }
+.vs-dot { width:6px; height:6px; border-radius:50%; }
+.vs-dot.win  { background:var(--green); }
+.vs-dot.lose { background:#f87171; }
+.vs-dot.tie  { background:var(--amber); }
+.vs-footer {
+  border-top:1px solid #363d52; padding:9px 14px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.vs-verdict {
+  font-family:'Syne',sans-serif; font-size:0.7rem; font-weight:800;
+  text-transform:uppercase; letter-spacing:0.05em;
+}
+.vs-score { font-size:0.65rem; color:var(--muted); }
+.vs-toggle-btn {
+  position:absolute; bottom:50px; right:14px;
+  background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.35);
+  color:#a5b4fc; font-family:'Syne',sans-serif; font-size:0.7rem; font-weight:700;
+  padding:7px 14px; border-radius:8px; cursor:pointer; letter-spacing:0.04em;
+  display:none; transition:all .15s; backdrop-filter:blur(6px);
+}
+.vs-toggle-btn:hover { background:rgba(99,102,241,0.25); }
+
+/* ─── Side by Side button ─── */
+.sbs-btn {
+  position:absolute; bottom:50px; left:14px;
+  background:rgba(45,212,191,0.12); border:1px solid rgba(45,212,191,0.3);
+  color:#2dd4bf; font-family:'Syne',sans-serif; font-size:0.7rem; font-weight:700;
+  padding:7px 14px; border-radius:8px; cursor:pointer; letter-spacing:0.04em;
+  display:none; transition:all .15s; backdrop-filter:blur(6px);
+}
+.sbs-btn:hover { background:rgba(45,212,191,0.22); }
+.sbs-btn.active { background:rgba(45,212,191,0.25); border-color:#2dd4bf; }
+.eto-section {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.eto-tag {
+  display:inline-flex; align-items:center; gap:5px;
+  background:rgba(248,113,113,0.1); color:#f87171;
+  border:1px solid rgba(248,113,113,0.25);
+  font-size:0.58rem; font-weight:700; padding:2px 8px;
+  border-radius:3px; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:10px;
+}
+.eto-alert-panel {
+  display:none; margin-top:10px;
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:8px; overflow:hidden;
+}
+.eto-alert-panel.visible { display:block; }
+.eto-alert-header {
+  background:rgba(248,113,113,0.08); border-bottom:1px solid var(--border);
+  padding:7px 12px; font-family:'Syne',sans-serif; font-size:0.65rem;
+  font-weight:700; letter-spacing:0.07em; color:#f87171; text-transform:uppercase;
+}
+.eto-alert-list { padding:8px 10px; display:flex; flex-direction:column; gap:5px; }
+.eto-alert-item {
+  display:flex; align-items:flex-start; gap:7px;
+  font-size:0.66rem; line-height:1.45; padding:5px 7px;
+  border-radius:5px;
+}
+.eto-alert-item.ok   { background:rgba(45,212,191,0.07); color:#2dd4bf; }
+.eto-alert-item.warn { background:rgba(248,113,113,0.08); color:#f87171; }
+.eto-alert-item.info { background:rgba(245,166,35,0.07); color:#f5a623; }
+.eto-alert-icon { flex-shrink:0; font-size:0.75rem; margin-top:1px; }
+.eto-weight-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:7px 12px; border-top:1px solid var(--border);
+  font-size:0.68rem;
+}
+.eto-weight-val { font-family:'Syne',sans-serif; font-weight:700; color:var(--amber); font-size:0.9rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>PalletSim <span style="color:var(--amber)">3D</span></h1>
+  <span class="tag">Standard US 40×48</span>
+  <span class="sub">Enter dimensions → Simulate</span>
+</header>
+
+<div class="main">
+  <!-- ── Sidebar ── -->
+  <div class="sidebar">
+
+    <div>
+      <div class="sec-title">Units</div>
+      <div class="unit-toggle">
+        <button id="btn-cm" onclick="setUnit('cm')">CM</button>
+        <button id="btn-in" class="active" onclick="setUnit('in')">IN</button>
+      </div>
+    </div>
+
+    <button class="btn-simulate" onclick="runSimulation()">▶ SIMULATE</button>
+
+    <div>
+      <div class="sec-title">Box Dimensions</div>
+      <div class="input-group">
+        <div class="input-row">
+          <span class="lbl-dim">L</span>
+          <input type="number" id="box-l" placeholder="Length" min="1" step="0.01" value="16.75">
+          <span class="lbl-unit unit-lbl">in</span>
+        </div>
+        <div class="input-row">
+          <span class="lbl-dim">W</span>
+          <input type="number" id="box-w" placeholder="Width" min="1" step="0.01" value="16.125">
+          <span class="lbl-unit unit-lbl">in</span>
+        </div>
+        <div class="input-row">
+          <span class="lbl-dim">H</span>
+          <input type="number" id="box-h" placeholder="Height" min="1" step="0.01" value="8.0625">
+          <span class="lbl-unit unit-lbl">in</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-title">Pallet Size</div>
+      <div class="pallet-type-toggle">
+        <button id="btn-std" class="active" onclick="setPalletType('standard')">📦 Standard US<br><span style="font-size:0.6rem;opacity:.7">40" × 48"</span></button>
+        <button id="btn-cus" onclick="setPalletType('custom')">✏️ Custom<br><span style="font-size:0.6rem;opacity:.7">Enter size</span></button>
+      </div>
+
+      <!-- Standard info -->
+      <div class="pallet-info" id="pallet-std-info">
+        <strong>Standard US (GMA)</strong><br>
+        Length: 101.6 cm (40")<br>
+        Width: &nbsp;121.9 cm (48")
+      </div>
+
+      <!-- Custom fields -->
+      <div class="custom-pallet-fields" id="custom-pallet-fields">
+        <div class="input-row">
+          <span class="lbl-dim">L</span>
+          <input type="number" id="pal-l" placeholder="Pallet Length" min="1" step="0.1">
+          <span class="lbl-unit unit-lbl">in</span>
+        </div>
+        <div class="input-row">
+          <span class="lbl-dim">W</span>
+          <input type="number" id="pal-w" placeholder="Pallet Width" min="1" step="0.1">
+          <span class="lbl-unit unit-lbl">in</span>
+        </div>
+        <div class="hint-text" style="margin-top:2px">Height is fixed at 14.5 cm</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-title">Max Stack Height</div>
+      <div class="input-group">
+        <div class="input-row">
+          <input type="number" id="max-h" placeholder="No limit" min="1" step="1">
+          <span class="lbl-unit unit-lbl">in</span>
+        </div>
+      </div>
+      <div class="hint-text" style="margin-top:5px">Empty = default (180 cm / 72")</div>
+    </div>
+
+    <div>
+      <div class="sec-title">Simulation Title</div>
+      <div class="input-group">
+        <input type="text" id="sim-title" placeholder="e.g. ENFit 35ml — Week 12" style="
+          flex:1; background:var(--bg); border:1px solid var(--border);
+          color:var(--text); padding:7px 10px; border-radius:5px;
+          font-family:'DM Mono',monospace; font-size:0.82rem; outline:none;
+          transition:border-color .15s; width:100%;
+        ">
+      </div>
+      <div class="hint-text" style="margin-top:5px">Shown as overlay on the 3D view</div>
+    </div>
+
+    <div class="eto-section">
+      <div class="eto-tag">🧪 ETO Sterilization</div>
+
+      <div class="sec-title">Chamber Internal Dimensions</div>
+      <div class="input-group">
+        <div class="input-row">
+          <span class="lbl-dim">L</span>
+          <input type="number" id="cham-l" placeholder="Length" min="1" step="1" value="180">
+          <span class="lbl-unit unit-lbl">in</span>
+        </div>
+        <div class="input-row">
+          <span class="lbl-dim">W</span>
+          <input type="number" id="cham-w" placeholder="Width" min="1" step="1" value="120">
+          <span class="lbl-unit unit-lbl">in</span>
+        </div>
+        <div class="input-row">
+          <span class="lbl-dim">H</span>
+          <input type="number" id="cham-h" placeholder="Height" min="1" step="1" value="200">
+          <span class="lbl-unit unit-lbl">in</span>
+        </div>
+      </div>
+      <div class="hint-text" style="margin-top:4px">Placeholder values — update with your actual chamber</div>
+
+      <div class="sec-title" style="margin-top:12px">Wall Clearance (per side)</div>
+      <div class="input-group">
+        <div class="input-row">
+          <input type="number" id="cham-clear" placeholder="Clearance" min="0" step="1" value="10">
+          <span class="lbl-unit unit-lbl">in</span>
+        </div>
+      </div>
+      <div class="hint-text" style="margin-top:4px">Min 10 cm recommended for ETO gas flow</div>
+
+      <div class="sec-title" style="margin-top:12px">Box Weight</div>
+      <div class="input-group">
+        <div class="input-row">
+          <input type="number" id="box-weight" placeholder="kg per box" min="0" step="0.1" value="2.0">
+          <span style="font-size:0.67rem;color:var(--muted);flex-shrink:0">kg</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="vs-section">
+      <div class="vs-tag">⚔️ Competitor</div>
+      <div class="sec-title">Competitor Name</div>
+      <input type="text" id="comp-name" value="TM" style="
+        background:var(--bg); border:1px solid var(--border); color:var(--text);
+        padding:7px 10px; border-radius:5px; font-family:'DM Mono',monospace;
+        font-size:0.82rem; outline:none; width:100%; margin-bottom:10px;
+        transition:border-color .15s;
+      ">
+
+      <div class="sec-title">Competitor Box (cm)</div>
+      <div class="input-group">
+        <div class="input-row">
+          <span class="lbl-dim" style="color:#a5b4fc">L</span>
+          <input type="number" id="comp-l" value="41" min="1" step="0.1">
+          <span style="font-size:0.67rem;color:var(--muted);flex-shrink:0">cm</span>
+        </div>
+        <div class="input-row">
+          <span class="lbl-dim" style="color:#a5b4fc">W</span>
+          <input type="number" id="comp-w" value="35" min="1" step="0.1">
+          <span style="font-size:0.67rem;color:var(--muted);flex-shrink:0">cm</span>
+        </div>
+        <div class="input-row">
+          <span class="lbl-dim" style="color:#a5b4fc">H</span>
+          <input type="number" id="comp-h" value="22" min="1" step="0.1">
+          <span style="font-size:0.67rem;color:var(--muted);flex-shrink:0">cm</span>
+        </div>
+        <div class="input-row">
+          <span class="lbl-dim" style="color:#a5b4fc;font-size:0.6rem">kg</span>
+          <input type="number" id="comp-kg" value="4.45" min="0" step="0.01" placeholder="Weight kg">
+          <span style="font-size:0.67rem;color:var(--muted);flex-shrink:0">kg/box</span>
+        </div>
+      </div>
+      <div class="hint-text" style="margin-top:5px">Pre-filled from TM palletization sheet</div>
+    </div>
+
+    <div id="stats-section" style="display:none">
+      <div class="sec-title">Results — <span id="active-config-name" style="color:var(--amber)">—</span></div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-val" id="stat-total">—</span>
+          <span class="stat-lbl">Total Boxes</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-val" id="stat-layers">—</span>
+          <span class="stat-lbl">Layers</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-val" id="stat-perlayer">—</span>
+          <span class="stat-lbl">Per Layer</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-val" id="stat-eff">—</span>
+          <span class="stat-lbl">Efficiency</span>
+        </div>
+      </div>
+
+      <!-- ETO Analysis -->
+      <div class="eto-alert-panel" id="eto-alert-panel">
+        <div class="eto-alert-header">🧪 ETO Sterilization Analysis</div>
+        <div class="eto-alert-list" id="eto-alert-list"></div>
+        <div class="eto-weight-row">
+          <span style="color:var(--muted)">Total pallet weight</span>
+          <span class="eto-weight-val" id="eto-weight-display">— kg</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── 3D Canvas ── -->
+  <div class="canvas-area">
+    <canvas id="three-canvas"></canvas>
+    <div class="empty-msg" id="empty-msg">
+      <div class="big">📦</div>
+      <div class="sm">Enter box dimensions and press SIMULATE</div>
+    </div>
+    <!-- Title overlay -->
+    <div id="sim-title-overlay" style="
+      display:none; position:absolute; top:14px; left:50%; transform:translateX(-50%);
+      background:rgba(15,17,23,0.82); border:1px solid var(--border);
+      backdrop-filter:blur(6px); padding:6px 18px; border-radius:24px;
+      font-family:'Syne',sans-serif; font-size:0.85rem; font-weight:700;
+      color:var(--text); letter-spacing:0.01em; pointer-events:none;
+      white-space:nowrap; max-width:60%; overflow:hidden; text-overflow:ellipsis;
+    "></div>
+    <div class="canvas-hint">🖱 Drag to rotate · Scroll to zoom</div>
+
+    <!-- Side by Side button -->
+    <button class="sbs-btn" id="sbs-btn" onclick="toggleSideBySide()">⟺ Side by Side</button>
+
+    <!-- VS Toggle Button -->
+    <button class="vs-toggle-btn" id="vs-toggle-btn" onclick="toggleVsPanel()">⚔️ vs TM</button>
+
+    <!-- VS Overlay Panel -->
+    <div class="vs-overlay" id="vs-overlay">
+      <div class="vs-header">
+        <span class="vs-header-title" id="vs-panel-title">You vs TM</span>
+        <button class="vs-close" onclick="toggleVsPanel()">✕</button>
+      </div>
+      <div class="vs-grid">
+        <div class="vs-col you">
+          <div class="vs-col-header">YOU</div>
+          <div class="vs-metric">
+            <span class="vs-metric-val" id="vs-you-boxes">—</span>
+            <span class="vs-metric-lbl">Boxes / Pallet</span>
+          </div>
+          <div class="vs-metric">
+            <span class="vs-metric-val" id="vs-you-eff">—</span>
+            <span class="vs-metric-lbl">Space Efficiency</span>
+          </div>
+          <div class="vs-metric">
+            <span class="vs-metric-val" id="vs-you-weight">—</span>
+            <span class="vs-metric-lbl">Pallet Weight</span>
+          </div>
+          <div class="vs-metric">
+            <span class="vs-metric-val" id="vs-you-boxvol">—</span>
+            <span class="vs-metric-lbl">Box Volume (L)</span>
+          </div>
+        </div>
+        <div class="vs-divider" id="vs-divider-dots">
+          <span class="vs-vs">VS</span>
+          <span class="vs-dot" id="dot-boxes"></span>
+          <span class="vs-dot" id="dot-eff"></span>
+          <span class="vs-dot" id="dot-weight"></span>
+          <span class="vs-dot" id="dot-vol"></span>
+        </div>
+        <div class="vs-col them">
+          <div class="vs-col-header" id="vs-them-label">TM</div>
+          <div class="vs-metric">
+            <span class="vs-metric-val" id="vs-tm-boxes">—</span>
+            <span class="vs-metric-lbl">Boxes / Pallet</span>
+          </div>
+          <div class="vs-metric">
+            <span class="vs-metric-val" id="vs-tm-eff">—</span>
+            <span class="vs-metric-lbl">Space Efficiency</span>
+          </div>
+          <div class="vs-metric">
+            <span class="vs-metric-val" id="vs-tm-weight">—</span>
+            <span class="vs-metric-lbl">Pallet Weight</span>
+          </div>
+          <div class="vs-metric">
+            <span class="vs-metric-val" id="vs-tm-boxvol">—</span>
+            <span class="vs-metric-lbl">Box Volume (L)</span>
+          </div>
+        </div>
+      </div>
+      <div class="vs-footer">
+        <span class="vs-verdict" id="vs-verdict">—</span>
+        <span class="vs-score" id="vs-score">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Compare Bar ── -->
+<div class="compare-bar" id="compare-bar" style="display:none">
+  <div class="cmp-card active" id="card-a" onclick="selectConfig('a')">
+    <div class="cmp-lbl">Config A</div>
+    <div class="cmp-big" id="ca-total">—</div>
+    <div class="cmp-sub" id="ca-sub">—</div>
+    <div class="cmp-name" id="ca-name">L×W Standard</div>
+    <div id="ca-feedback"></div>
+  </div>
+  <div class="cmp-card" id="card-b" onclick="selectConfig('b')">
+    <div class="cmp-lbl">Config B</div>
+    <div class="cmp-big" id="cb-total">—</div>
+    <div class="cmp-sub" id="cb-sub">—</div>
+    <div class="cmp-name" id="cb-name">W×L Rotated</div>
+    <div id="cb-feedback"></div>
+  </div>
+  <div class="cmp-card" id="card-c" onclick="selectConfig('c')">
+    <div class="cmp-lbl">Config C</div>
+    <div class="cmp-big" id="cc-total">—</div>
+    <div class="cmp-sub" id="cc-sub">—</div>
+    <div class="cmp-name" id="cc-name">Brick Pattern</div>
+    <div id="cc-feedback"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let currentUnit = 'in';
+let currentConfig = 'a';
+let currentPalletType = 'standard';
+let configs = {};
+let scene, camera, renderer, boxGroup, palletGroup;
+let isDragging = false, prevMouse = {x:0,y:0};
+let spherical = { theta: Math.PI * 0.25, phi: Math.PI * 0.32, radius: 18 };
+
+const PALLET_STANDARD = { L: 101.6, W: 121.9, H: 14.5 };
+let PALLET_CM = { ...PALLET_STANDARD };
+const SCALE = 1/10;
+const DEFAULT_MAX_CM = 180;
+
+// ═══════════════════════════════════════════
+// UNIT HELPERS
+// ═══════════════════════════════════════════
+function toCm(v) { return currentUnit === 'in' ? v * 2.54 : v; }
+function fmtU(v) { return currentUnit === 'in' ? (v/2.54).toFixed(2)+'"' : v.toFixed(1)+'cm'; }
+
+function setUnit(u) {
+  currentUnit = u;
+  document.getElementById('btn-cm').classList.toggle('active', u==='cm');
+  document.getElementById('btn-in').classList.toggle('active', u==='in');
+  document.querySelectorAll('.unit-lbl').forEach(el => el.textContent = u);
+}
+
+// ═══════════════════════════════════════════
+// PALLET TYPE
+// ═══════════════════════════════════════════
+function setPalletType(type) {
+  currentPalletType = type;
+  document.getElementById('btn-std').classList.toggle('active', type==='standard');
+  document.getElementById('btn-cus').classList.toggle('active', type==='custom');
+  document.getElementById('pallet-std-info').style.display = type==='standard' ? 'block' : 'none';
+  const customFields = document.getElementById('custom-pallet-fields');
+  customFields.classList.toggle('visible', type==='custom');
+  // Update header badge
+  const tag = document.querySelector('header .tag');
+  tag.textContent = type==='standard' ? 'Standard US 40×48' : 'Custom Pallet';
+}
+
+// ═══════════════════════════════════════════
+// PACKING ALGORITHMS
+// ═══════════════════════════════════════════
+function getLayers(boxH, maxH) {
+  const limit = (maxH && maxH > 0) ? maxH : DEFAULT_MAX_CM;
+  const n = Math.floor(limit / boxH);
+  return Math.max(1, Math.min(n, 25));
+}
+
+function calcStandard(palL, palW, boxL, boxW, boxH, maxH) {
+  const bpl = Math.floor(palL / boxL);  // boxes along length
+  const bpw = Math.floor(palW / boxW);  // boxes along width
+  const perLayer = bpl * bpw;
+  const layers = getLayers(boxH, maxH);
+  const total = perLayer * layers;
+  const stackH = layers * boxH;
+  const palVol = palL * palW * stackH;
+  const boxVol = boxL * boxW * boxH;
+  const eff = palVol > 0 ? ((total * boxVol / palVol) * 100).toFixed(1) : 0;
+  return { bpl, bpw, perLayer, layers, total, stackH, eff, boxL, boxW, boxH, type:'standard' };
+}
+
+function calcBrick(palL, palW, boxL, boxW, boxH, maxH) {
+  // Alternate rows: even rows → L×W, odd rows → W×L along width axis
+  const layers = getLayers(boxH, maxH);
+  const rows = [];
+  let usedW = 0;
+  let toggle = true;
+  while(true) {
+    const rowDepth = toggle ? boxW : boxL;
+    const rowCount = toggle ? Math.floor(palL / boxL) : Math.floor(palL / boxW);
+    if(usedW + rowDepth > palW + 0.01) break;
+    rows.push({ type: toggle ? 'A' : 'B', count: rowCount, depth: rowDepth });
+    usedW += rowDepth;
+    toggle = !toggle;
+  }
+  const perLayer = rows.reduce((s, r) => s + r.count, 0);
+  const total = perLayer * layers;
+  const stackH = layers * boxH;
+  const palVol = palL * palW * stackH;
+  const boxVol = boxL * boxW * boxH;
+  const eff = palVol > 0 ? ((total * boxVol / palVol) * 100).toFixed(1) : 0;
+  return { rows, bpl: rows[0]?.count||0, bpw: rows.length, perLayer, layers, total, stackH, eff, boxL, boxW, boxH, type:'brick' };
+}
+
+// ═══════════════════════════════════════════
+// SIMULATION RUNNER
+// ═══════════════════════════════════════════
+function runSimulation() {
+  const rawL = parseFloat(document.getElementById('box-l').value);
+  const rawW = parseFloat(document.getElementById('box-w').value);
+  const rawH = parseFloat(document.getElementById('box-h').value);
+  const rawMax = parseFloat(document.getElementById('max-h').value);
+
+  if(!rawL || !rawW || !rawH || rawL<=0 || rawW<=0 || rawH<=0) {
+    showError('Enter valid dimensions (L, W, H > 0)');
+    return;
+  }
+
+  const boxL = toCm(rawL);
+  const boxW = toCm(rawW);
+  const boxH = toCm(rawH);
+  const maxH = isNaN(rawMax) ? null : toCm(rawMax);
+
+  // Resolve pallet size
+  if(currentPalletType === 'standard') {
+    PALLET_CM.L = PALLET_STANDARD.L;
+    PALLET_CM.W = PALLET_STANDARD.W;
+    PALLET_CM.H = PALLET_STANDARD.H;
+  } else {
+    const rawPL = parseFloat(document.getElementById('pal-l').value);
+    const rawPW = parseFloat(document.getElementById('pal-w').value);
+    if(!rawPL || !rawPW || rawPL<=0 || rawPW<=0) {
+      showError('Enter valid custom pallet L and W');
+      return;
+    }
+    PALLET_CM.L = toCm(rawPL);
+    PALLET_CM.W = toCm(rawPW);
+    PALLET_CM.H = PALLET_STANDARD.H;
+  }
+
+  if(boxL > PALLET_CM.L || boxW > PALLET_CM.W) {
+    showError('⚠️ Box is larger than the pallet in L or W. Please check dimensions.');
+    return;
+  }
+
+  const pL = PALLET_CM.L, pW = PALLET_CM.W;
+
+  configs.a = calcStandard(pL, pW, boxL, boxW, boxH, maxH);
+  configs.a.name = 'L×W Standard';
+  configs.a._rotated = false;
+
+  configs.b = calcStandard(pL, pW, boxW, boxL, boxH, maxH);
+  configs.b.name = 'W×L Rotated';
+  configs.b._rotated = true;
+
+  configs.c = calcBrick(pL, pW, boxL, boxW, boxH, maxH);
+  configs.c.name = 'Brick Pattern';
+  configs.c._rotated = false;
+
+  // Find best by total boxes
+  const best = ['a','b','c'].reduce((acc,k) => configs[k].total > configs[acc].total ? k : acc, 'a');
+  const maxTotal = configs[best].total;
+
+  // Update compare bar
+  ['a','b','c'].forEach(k => {
+    const c = configs[k];
+    document.getElementById(`c${k}-total`).textContent = c.total;
+    document.getElementById(`c${k}-sub`).textContent =
+      `${c.perLayer}/layer × ${c.layers} layers · ${c.eff}% eff.`;
+    document.getElementById(`c${k}-name`).textContent = c.name;
+
+    // ── Best badge ──
+    const old = document.getElementById(`badge-${k}`);
+    if(old) old.remove();
+    if(k === best) {
+      const b = document.createElement('div');
+      b.className = 'best-badge'; b.id = `badge-${k}`; b.textContent = '★ BEST';
+      document.getElementById(`card-${k}`).appendChild(b);
+    }
+
+    // ── Feedback chip ──
+    document.getElementById(`c${k}-feedback`).innerHTML = getFeedback(c, k === best, maxTotal);
+  });
+
+  document.getElementById('compare-bar').style.display = 'flex';
+  document.getElementById('stats-section').style.display = 'block';
+  document.getElementById('empty-msg').style.display = 'none';
+  document.getElementById('sbs-btn').style.display = 'block';
+
+  // Update title overlay
+  const titleVal = document.getElementById('sim-title').value.trim();
+  const overlay = document.getElementById('sim-title-overlay');
+  if(titleVal) {
+    overlay.textContent = titleVal;
+    overlay.style.display = 'block';
+  } else {
+    overlay.style.display = 'none';
+  }
+
+  // Redraw pallet in case custom size changed
+  drawPallet();
+  selectConfig('a', true);
+}
+
+// ═══════════════════════════════════════════
+// FEEDBACK ENGINE
+// ═══════════════════════════════════════════
+function getFeedback(c, isBest, maxTotal) {
+  const eff = parseFloat(c.eff);
+  const diff = maxTotal - c.total;
+  const msgs = [];
+
+  // Efficiency rating
+  if (eff >= 90)      msgs.push({ cls:'feedback-good', icon:'✅', text:'Excellent space use' });
+  else if (eff >= 75) msgs.push({ cls:'feedback-ok',   icon:'🔶', text:'Good efficiency' });
+  else                msgs.push({ cls:'feedback-warn',  icon:'⚠️', text:'Low efficiency — wasted space' });
+
+  // Compare to best
+  if (!isBest && diff > 0) {
+    if (diff <= 2)       msgs.push({ cls:'feedback-ok',  icon:'≈', text:`${diff} box${diff>1?'es':''} behind best` });
+    else if (diff <= 10) msgs.push({ cls:'feedback-ok',  icon:'↓', text:`${diff} fewer boxes than best` });
+    else                 msgs.push({ cls:'feedback-warn', icon:'↓↓', text:`${diff} fewer boxes — not recommended` });
+  }
+
+  // Layer count check
+  if (c.layers >= 12) msgs.push({ cls:'feedback-warn', icon:'⚠️', text:'Tall stack — check stability' });
+
+  // Per-layer count
+  if (c.perLayer <= 2) msgs.push({ cls:'feedback-warn', icon:'⚠️', text:'Very few boxes per layer' });
+
+  // Brick pattern specific
+  if (c.type === 'brick') msgs.push({ cls:'feedback-good', icon:'🧱', text:'Interlocked — better stability' });
+
+  // If this is the best overall
+  if (isBest) msgs.push({ cls:'feedback-good', icon:'★', text:'Maximum boxes' });
+
+  return msgs.slice(0,2).map(m =>
+    `<span class="cmp-feedback ${m.cls}">${m.icon} ${m.text}</span>`
+  ).join(' ');
+}
+
+// ═══════════════════════════════════════════
+// ETO STERILIZATION ANALYSIS
+// ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
+// VS COMPETITOR ENGINE
+// ═══════════════════════════════════════════
+let vsVisible = false;
+
+function toggleVsPanel() {
+  vsVisible = !vsVisible;
+  document.getElementById('vs-overlay').classList.toggle('visible', vsVisible);
+}
+
+function runVsComparison(yourConfig) {
+  const compName = document.getElementById('comp-name').value.trim() || 'TM';
+  const compL = parseFloat(document.getElementById('comp-l').value) || 41;
+  const compW = parseFloat(document.getElementById('comp-w').value) || 35;
+  const compH = parseFloat(document.getElementById('comp-h').value) || 22;
+  const compKg = parseFloat(document.getElementById('comp-kg').value) || 4.45;
+  const yourKg = parseFloat(document.getElementById('box-weight').value) || 0;
+
+  // Compute TM's best config — use uncapped height so their 9 layers always fit
+  const pL = PALLET_CM.L, pW = PALLET_CM.W;
+  const tmUnlimitedH = compH * 9 + 1; // exactly enough for 9 layers
+
+  const tmA = calcStandard(pL, pW, compL, compW, compH, tmUnlimitedH);
+  const tmB = calcStandard(pL, pW, compW, compL, compH, tmUnlimitedH);
+  const tmC = calcBrick(pL, pW, compL, compW, compH, tmUnlimitedH);
+  const tmBest = [tmA, tmB, tmC].reduce((a, b) => b.total > a.total ? b : a);
+
+  // Metrics
+  const youBoxes = yourConfig.total;
+  const tmBoxes  = tmBest.total;
+  const youEff   = parseFloat(yourConfig.eff);
+  const tmEff    = parseFloat(tmBest.eff);
+  const youWeight = yourKg > 0 ? (youBoxes * yourKg) : null;
+  const tmWeight  = tmBoxes * compKg;
+  const youVol = (yourConfig.boxL * yourConfig.boxW * yourConfig.boxH / 1000).toFixed(2);
+  const tmVol  = (compL * compW * compH / 1000).toFixed(2);
+
+  // Win / lose per metric (lower weight = better, higher boxes/eff = better)
+  function winLose(youVal, tmVal, higherIsBetter) {
+    if (youVal === tmVal) return ['tie','tie'];
+    const youWins = higherIsBetter ? youVal > tmVal : youVal < tmVal;
+    return youWins ? ['win','lose'] : ['lose','win'];
+  }
+
+  const [bYou, bTm]  = winLose(youBoxes, tmBoxes, true);
+  const [eYou, eTm]  = winLose(youEff, tmEff, true);
+  const [wYou, wTm]  = youWeight ? winLose(youWeight, tmWeight, false) : ['tie','tie'];
+  const [vYou, vTm]  = winLose(parseFloat(youVol), parseFloat(tmVol), false); // smaller box = more efficient packaging
+
+  // Score
+  const youWins = [bYou,eYou,wYou,vYou].filter(x=>x==='win').length;
+  const tmWins  = [bTm,eTm,wTm,vTm].filter(x=>x==='win').length;
+
+  // Render
+  document.getElementById('vs-panel-title').textContent = `You vs ${compName}`;
+  document.getElementById('vs-them-label').textContent = compName;
+  document.getElementById('vs-toggle-btn').textContent = `⚔️ vs ${compName}`;
+
+  const set = (id, val, cls) => {
+    const el = document.getElementById(id);
+    el.textContent = val;
+    el.className = `vs-metric-val ${cls}`;
+  };
+
+  set('vs-you-boxes',  youBoxes,                                          bYou);
+  set('vs-tm-boxes',   tmBoxes,                                           bTm);
+  set('vs-you-eff',    youEff + '%',                                      eYou);
+  set('vs-tm-eff',     tmEff + '%',                                       eTm);
+  set('vs-you-weight', youWeight ? youWeight.toFixed(1)+'kg' : '—',      wYou);
+  set('vs-tm-weight',  tmWeight.toFixed(1)+'kg',                          wTm);
+  set('vs-you-boxvol', youVol+'L',                                        vYou);
+  set('vs-tm-boxvol',  tmVol+'L',                                         vTm);
+
+  ['boxes','eff','weight','vol'].forEach((m,i) => {
+    const dotEl = document.getElementById(`dot-${m}`);
+    const youCls = [bYou,eYou,wYou,vYou][i];
+    dotEl.className = `vs-dot ${youCls}`;
+  });
+
+  let verdict, verdictColor;
+  if (youWins > tmWins) {
+    verdict = `✅ You lead ${compName}`;
+    verdictColor = 'var(--green)';
+  } else if (tmWins > youWins) {
+    verdict = `⚠️ ${compName} leads — adjust config`;
+    verdictColor = '#f87171';
+  } else {
+    verdict = `≈ Tied — differentiate on other factors`;
+    verdictColor = 'var(--amber)';
+  }
+  const verdEl = document.getElementById('vs-verdict');
+  verdEl.textContent = verdict;
+  verdEl.style.color = verdictColor;
+  document.getElementById('vs-score').textContent = `${youWins} – ${tmWins} metrics`;
+
+  // Show button
+  document.getElementById('vs-toggle-btn').style.display = 'block';
+}
+
+function runEtoAnalysis(config) {
+  const chamL = toCm(parseFloat(document.getElementById('cham-l').value) || 180);
+  const chamW = toCm(parseFloat(document.getElementById('cham-w').value) || 120);
+  const chamH = toCm(parseFloat(document.getElementById('cham-h').value) || 200);
+  const clear = toCm(parseFloat(document.getElementById('cham-clear').value) || 10);
+  const boxKg = parseFloat(document.getElementById('box-weight').value) || 0;
+
+  const stackH = PALLET_CM.H + config.stackH; // pallet + boxes
+  const totalKg = boxKg > 0 ? (config.total * boxKg).toFixed(1) : null;
+
+  const alerts = [];
+
+  // 1 — Pallet footprint vs chamber (with clearance)
+  const maxPalL = chamL - clear * 2;
+  const maxPalW = chamW - clear * 2;
+  const fitL = PALLET_CM.L <= maxPalL;
+  const fitW = PALLET_CM.W <= maxPalW;
+  if (fitL && fitW) {
+    alerts.push({ type:'ok', icon:'✅', text:`Pallet fits in chamber with ≥${clear} cm clearance on all sides` });
+  } else {
+    const issues = [];
+    if (!fitL) issues.push(`Length exceeds limit by ${(PALLET_CM.L - maxPalL).toFixed(1)} cm`);
+    if (!fitW) issues.push(`Width exceeds limit by ${(PALLET_CM.W - maxPalW).toFixed(1)} cm`);
+    alerts.push({ type:'warn', icon:'⛔', text:`Pallet does NOT fit with ${clear} cm clearance — ${issues.join(' · ')}` });
+  }
+
+  // 2 — Stack height vs chamber height
+  const maxStackH = chamH - clear;
+  if (stackH <= maxStackH) {
+    alerts.push({ type:'ok', icon:'✅', text:`Stack height ${stackH.toFixed(1)} cm fits in chamber (max ${maxStackH.toFixed(1)} cm)` });
+  } else {
+    alerts.push({ type:'warn', icon:'⛔', text:`Stack too tall! ${stackH.toFixed(1)} cm exceeds chamber max ${maxStackH.toFixed(1)} cm — reduce layers` });
+  }
+
+  // 3 — ETO gas circulation (brick vs standard)
+  if (config.type === 'brick') {
+    alerts.push({ type:'info', icon:'🔶', text:'Brick pattern: good structural interlock, but verify box porosity for ETO penetration' });
+  } else {
+    alerts.push({ type:'ok', icon:'✅', text:'Aligned columns allow good ETO gas flow between box rows' });
+  }
+
+  // 4 — Layer count / stability warning
+  if (config.layers > 10) {
+    alerts.push({ type:'warn', icon:'⚠️', text:`${config.layers} layers — tall stack may shift during chamber depressurization. Consider shrink wrap.` });
+  }
+
+  // 5 — Pallet material reminder
+  alerts.push({ type:'warn', icon:'⚠️', text:'ETO requires plastic pallets — wood absorbs moisture and can off-gas. Verify pallet material.' });
+
+  // 6 — Weight check (typical ETO cart limit ~500 kg)
+  if (totalKg) {
+    const kg = parseFloat(totalKg);
+    if (kg > 500) {
+      alerts.push({ type:'warn', icon:'⛔', text:`Total load ${totalKg} kg exceeds typical ETO cart limit (~500 kg). Verify with supplier.` });
+    } else if (kg > 350) {
+      alerts.push({ type:'info', icon:'🔶', text:`Total load ${totalKg} kg — approaching cart limit. Confirm max capacity with sterilizer supplier.` });
+    } else {
+      alerts.push({ type:'ok', icon:'✅', text:`Total load ${totalKg} kg — within typical ETO cart capacity` });
+    }
+  }
+
+  // Render alerts
+  const list = document.getElementById('eto-alert-list');
+  list.innerHTML = alerts.map(a =>
+    `<div class="eto-alert-item ${a.type}"><span class="eto-alert-icon">${a.icon}</span><span>${a.text}</span></div>`
+  ).join('');
+
+  document.getElementById('eto-weight-display').textContent =
+    totalKg ? `${totalKg} kg` : 'Enter box weight';
+  document.getElementById('eto-alert-panel').classList.add('visible');
+}
+
+function selectConfig(key, force) {
+  if(key === currentConfig && !force) return;
+  currentConfig = key;
+  ['a','b','c'].forEach(k => document.getElementById(`card-${k}`).classList.toggle('active', k===key));
+  const c = configs[key];
+  if(!c) return;
+  document.getElementById('active-config-name').textContent = c.name;
+  document.getElementById('stat-total').textContent = c.total;
+  document.getElementById('stat-layers').textContent = c.layers;
+  document.getElementById('stat-perlayer').textContent = c.perLayer;
+  document.getElementById('stat-eff').textContent = c.eff + '%';
+  runEtoAnalysis(c);
+  runVsComparison(c);
+  render3D(c);
+}
+
+function showError(msg) {
+  const btn = document.querySelector('.btn-simulate');
+  const orig = btn.textContent;
+  btn.textContent = msg;
+  btn.style.background = '#f87171';
+  setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 2500);
+}
+
+// ═══════════════════════════════════════════
+// THREE.JS INIT
+// ═══════════════════════════════════════════
+let tmPalletGroup, tmBoxGroup, labelGroup;
+let isSideBySide = false;
+
+function initThree() {
+  const canvas = document.getElementById('three-canvas');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.setClearColor(0x0f1117, 1);
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0f1117, 0.014);
+
+  camera = new THREE.PerspectiveCamera(42, 1, 0.1, 300);
+  updateCamera();
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+  const sun = new THREE.DirectionalLight(0xfff8e7, 1.1);
+  sun.position.set(8, 14, 6);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 60;
+  sun.shadow.camera.left = -20; sun.shadow.camera.right = 20;
+  sun.shadow.camera.top = 20; sun.shadow.camera.bottom = -20;
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0xf5a623, 0.25);
+  fill.position.set(-6, 4, -4); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0x4488ff, 0.15);
+  rim.position.set(0, -2, -8); scene.add(rim);
+
+  // Floor grid
+  const grid = new THREE.GridHelper(60, 60, 0x1a2035, 0x141926);
+  scene.add(grid);
+
+  // Shadow plane
+  const shadowPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(60, 60),
+    new THREE.ShadowMaterial({ opacity: 0.3 })
+  );
+  shadowPlane.rotation.x = -Math.PI/2;
+  shadowPlane.receiveShadow = true;
+  scene.add(shadowPlane);
+
+  palletGroup  = new THREE.Group(); scene.add(palletGroup);
+  boxGroup     = new THREE.Group(); scene.add(boxGroup);
+  tmPalletGroup = new THREE.Group(); scene.add(tmPalletGroup);
+  tmBoxGroup   = new THREE.Group(); scene.add(tmBoxGroup);
+  labelGroup   = new THREE.Group(); scene.add(labelGroup);
+
+  drawPalletAt(palletGroup, 0, 'wood');
+  setupOrbit(canvas);
+  window.addEventListener('resize', onResize);
+  onResize();
+  animate();
+}
+
+// ═══════════════════════════════════════════
+// PALLET GEOMETRY
+// ═══════════════════════════════════════════
+function clearGroup(g) { while(g.children.length) g.remove(g.children[0]); }
+
+function drawPalletAt(group, offsetX, style) {
+  clearGroup(group);
+  const pL = PALLET_CM.L * SCALE;
+  const pW = PALLET_CM.W * SCALE;
+  const pH = PALLET_CM.H * SCALE;
+
+  if (style === 'plastic') {
+    // Blue-gray plastic pallet (TM style)
+    const mat1 = new THREE.MeshLambertMaterial({ color: 0x4a6fa5 });
+    const mat2 = new THREE.MeshLambertMaterial({ color: 0x3a5a8a });
+    // Main deck
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(pL, pH*0.3, pW), mat1);
+    deck.position.set(offsetX, pH*0.85, 0);
+    deck.castShadow = true; deck.receiveShadow = true;
+    group.add(deck);
+    // Legs (6)
+    const legW = pL*0.12, legD = pW*0.12, legH = pH*0.7;
+    [[-pL*0.38, -pW*0.38],[0,-pW*0.38],[pL*0.38,-pW*0.38],
+     [-pL*0.38,  pW*0.38],[0, pW*0.38],[pL*0.38, pW*0.38]].forEach(([x,z]) => {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(legW, legH, legD), mat2);
+      leg.position.set(offsetX + x, legH/2, z);
+      leg.castShadow = true;
+      group.add(leg);
+    });
+    // Bottom rails
+    [-pL*0.38, 0, pL*0.38].forEach(x => {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(pL*0.1, pH*0.18, pW), mat1);
+      rail.position.set(offsetX + x, pH*0.09, 0);
+      group.add(rail);
+    });
+    group.userData.topY = pH*0.85 + pH*0.15;
+  } else {
+    // Wood pallet (your style)
+    const woodDark  = new THREE.MeshLambertMaterial({ color: 0x7a5c2e });
+    const woodLight = new THREE.MeshLambertMaterial({ color: 0x8B6914 });
+    const woodMid   = new THREE.MeshLambertMaterial({ color: 0x6B4F10 });
+    const deckH = pH * 0.35;
+    [-pW*0.33, 0, pW*0.33].forEach(z => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(pL, deckH, pW*0.28), woodLight);
+      m.position.set(offsetX, pH + deckH/2, z);
+      m.castShadow = true; m.receiveShadow = true;
+      group.add(m);
+    });
+    const topM = new THREE.Mesh(new THREE.BoxGeometry(pL, deckH*0.4, pW), woodDark);
+    topM.position.set(offsetX, pH + deckH + deckH*0.2, 0);
+    topM.receiveShadow = true;
+    group.add(topM);
+    [-pL*0.38, 0, pL*0.38].forEach(x => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(pL*0.12, pH*0.4, pW), woodMid);
+      m.position.set(offsetX + x, pH*0.2, 0);
+      m.castShadow = true; group.add(m);
+    });
+    const blockH = pH*0.6;
+    [-pL*0.38, 0, pL*0.38].forEach(x => {
+      [-pW*0.38, 0, pW*0.38].forEach(z => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(pL*0.13, blockH, pW*0.13), woodDark);
+        m.position.set(offsetX + x, pH*0.4 + blockH/2, z);
+        m.castShadow = true; group.add(m);
+      });
+    });
+    group.userData.topY = pH + deckH + deckH*0.4;
+  }
+}
+
+function drawPallet() {
+  drawPalletAt(palletGroup, 0, 'wood');
+}
+
+// ─── Floating label sprite ───
+function makeLabel(text, color, x, y, z) {
+  const canvas2d = document.createElement('canvas');
+  canvas2d.width = 256; canvas2d.height = 64;
+  const ctx = canvas2d.getContext('2d');
+  ctx.fillStyle = 'rgba(15,17,23,0.85)';
+  ctx.roundRect(4, 4, 248, 56, 10);
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.roundRect(4, 4, 248, 56, 10);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.font = 'bold 28px Syne, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 32);
+  const tex = new THREE.CanvasTexture(canvas2d);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+  const sprite = new THREE.Sprite(mat);
+  sprite.position.set(x, y, z);
+  sprite.scale.set(2.5, 0.62, 1);
+  return sprite;
+}
+
+// ═══════════════════════════════════════════
+// BOX RENDERING
+// ═══════════════════════════════════════════
+const BOX_COLORS = [ 0xf5a623, 0xd4891e ];
+const TM_COLORS  = [ 0x6B7A2A, 0x4e5a1e ];
+
+function renderBoxesIntoGroup(group, config, offsetX, palette, topY, showArrows = true) {
+  clearGroup(group);
+  const pL = PALLET_CM.L * SCALE;
+  const pW = PALLET_CM.W * SCALE;
+  const bL = config.boxL * SCALE;
+  const bW = config.boxW * SCALE;
+  const bH = config.boxH * SCALE;
+  const gap = 0.007;
+  const startX = offsetX - pL / 2;
+  const startZ = -pW / 2;
+
+  // ── Arrow: shows LENGTH direction only — top face + front face ──
+  function addArrow(px, py, pz, boxLdim, boxWdim, rotY) {
+    const margin = boxLdim * 0.08;
+    const x0 = -boxLdim/2 + margin;
+    const x1 =  boxLdim/2 - margin;
+    const hSize = boxLdim * 0.18;
+    const hAng  = Math.PI / 6;
+    const off   = 0.014;
+    const mat   = new THREE.LineBasicMaterial({ color: 0x111122, depthWrite: true });
+
+    function arrowPtsTop(atY) {
+      return [
+        new THREE.Vector3(x0, atY, 0), new THREE.Vector3(x1, atY, 0),
+        new THREE.Vector3(x1, atY, 0), new THREE.Vector3(x1 - Math.cos(hAng)*hSize, atY,  Math.sin(hAng)*hSize),
+        new THREE.Vector3(x1, atY, 0), new THREE.Vector3(x1 - Math.cos(hAng)*hSize, atY, -Math.sin(hAng)*hSize),
+      ];
+    }
+
+    function arrowPtsFront(atZ) {
+      return [
+        new THREE.Vector3(x0, 0, atZ), new THREE.Vector3(x1, 0, atZ),
+        new THREE.Vector3(x1, 0, atZ), new THREE.Vector3(x1 - Math.cos(hAng)*hSize,  Math.sin(hAng)*hSize, atZ),
+        new THREE.Vector3(x1, 0, atZ), new THREE.Vector3(x1 - Math.cos(hAng)*hSize, -Math.sin(hAng)*hSize, atZ),
+      ];
+    }
+
+    const wrapper = new THREE.Group();
+    wrapper.position.set(px, py, pz);
+    wrapper.rotation.y = rotY;
+
+    wrapper.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(arrowPtsTop(bH/2 + off)), mat));
+    wrapper.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(arrowPtsFront(-boxWdim/2 - off)), mat));
+
+    group.add(wrapper);
+  }
+
+  // ── Waste overlay (only layer 0 surface) ──
+  function addWasteOverlay() {
+    const wasteMat = new THREE.MeshBasicMaterial({
+      color: 0xff4444, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide
+    });
+    const borderMat = new THREE.LineBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.45 });
+    const surfY = topY + 0.005; // just above pallet surface
+
+    if (config.type === 'brick' && config.rows) {
+      // For brick: compute used X and used Z bounding box
+      let maxUsedX = 0;
+      let maxUsedZ = 0;
+      let zc = 0;
+      config.rows.forEach(row => {
+        const rowL = row.type === 'A' ? bL : bW;
+        const rowD = row.type === 'A' ? bW : bL;
+        const rowUsedX = row.count * rowL;
+        maxUsedX = Math.max(maxUsedX, rowUsedX);
+        maxUsedZ = zc + rowD;
+        zc += rowD;
+      });
+      // Right waste strip
+      const gapX = pL - maxUsedX;
+      if (gapX > 0.02) {
+        const geo = new THREE.PlaneGeometry(gapX, pW);
+        const mesh = new THREE.Mesh(geo, wasteMat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(offsetX + pL / 2 - gapX / 2, surfY, 0);
+        group.add(mesh);
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), borderMat);
+        edges.rotation.x = -Math.PI / 2;
+        edges.position.copy(mesh.position);
+        group.add(edges);
+      }
+      // Front waste strip
+      const gapZ = pW - maxUsedZ;
+      if (gapZ > 0.02) {
+        const geo = new THREE.PlaneGeometry(maxUsedX, gapZ);
+        const mesh = new THREE.Mesh(geo, wasteMat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(offsetX - pL / 2 + maxUsedX / 2, surfY, pW / 2 - gapZ / 2);
+        group.add(mesh);
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), borderMat);
+        edges.rotation.x = -Math.PI / 2;
+        edges.position.copy(mesh.position);
+        group.add(edges);
+      }
+    } else {
+      const usedX = config.bpl * bL;
+      const usedZ = config.bpw * bW;
+      // Right strip (full depth)
+      const gapX = pL - usedX;
+      if (gapX > 0.02) {
+        const geo = new THREE.PlaneGeometry(gapX, pW);
+        const mesh = new THREE.Mesh(geo, wasteMat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(startX + usedX + gapX / 2, surfY, 0);
+        group.add(mesh);
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), borderMat);
+        edges.rotation.x = -Math.PI / 2; edges.position.copy(mesh.position);
+        group.add(edges);
+      }
+      // Front strip (within used X only)
+      const gapZ = pW - usedZ;
+      if (gapZ > 0.02) {
+        const geo = new THREE.PlaneGeometry(usedX, gapZ);
+        const mesh = new THREE.Mesh(geo, wasteMat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(startX + usedX / 2, surfY, startZ + usedZ + gapZ / 2);
+        group.add(mesh);
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), borderMat);
+        edges.rotation.x = -Math.PI / 2; edges.position.copy(mesh.position);
+        group.add(edges);
+      }
+    }
+  }
+
+  addWasteOverlay();
+
+  // ── Box rendering ──
+  for (let layer = 0; layer < config.layers; layer++) {
+    const col = palette[layer % palette.length];
+    const mat = new THREE.MeshLambertMaterial({ color: col, transparent: true, opacity: 0.94 });
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 });
+    const layerY = topY + layer * bH + bH / 2;
+    const showLayerArrow = showArrows; // show on every layer
+
+    if (config.type === 'brick' && config.rows) {
+      let zCursor = startZ;
+      config.rows.forEach(row => {
+        const rL   = row.type === 'A' ? bL : bW;
+        const rW   = row.type === 'A' ? bW : bL;
+        // Arrow rotation: type A points along X (0), type B points along Z (π/2)
+        const arrowRot = row.type === 'A' ? 0 : Math.PI / 2;
+        const rMat = new THREE.MeshLambertMaterial({ color: col, transparent: true, opacity: 0.94 });
+        const rGeo  = new THREE.BoxGeometry(rL - gap, bH - gap, rW - gap);
+        const rEdge = new THREE.EdgesGeometry(new THREE.BoxGeometry(rL, bH, rW));
+        for (let i = 0; i < row.count; i++) {
+          const px = startX + i * rL + rL / 2;
+          const pz = zCursor + rW / 2;
+          const mesh = new THREE.Mesh(rGeo, rMat);
+          mesh.position.set(px, layerY, pz);
+          mesh.castShadow = true; mesh.receiveShadow = true;
+          group.add(mesh);
+          const edges = new THREE.LineSegments(rEdge, edgeMat);
+          edges.position.copy(mesh.position);
+          group.add(edges);
+          if (showLayerArrow) addArrow(px, layerY, pz, rL, rW, arrowRot);
+        }
+        zCursor += row.depth * SCALE;
+      });
+    } else {
+      const geo     = new THREE.BoxGeometry(bL - gap, bH - gap, bW - gap);
+      const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(bL, bH, bW));
+      for (let row = 0; row < config.bpw; row++) {
+        for (let col2 = 0; col2 < config.bpl; col2++) {
+          const px = startX + col2 * bL + bL / 2;
+          const pz = startZ + row * bW + bW / 2;
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.position.set(px, layerY, pz);
+          mesh.castShadow = true; mesh.receiveShadow = true;
+          group.add(mesh);
+          const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+          edges.position.copy(mesh.position);
+          group.add(edges);
+          // Arrow: detect if this config has boxes rotated (W×L) by checking stored orientation flag
+          const arrowRot = config._rotated ? Math.PI / 2 : 0;
+          if (showLayerArrow) addArrow(px, layerY, pz, bL, bW, arrowRot);
+        }
+      }
+    }
+  }
+}
+
+// ─── Side-by-side toggle ───
+function toggleSideBySide() {
+  isSideBySide = !isSideBySide;
+  const btn = document.getElementById('sbs-btn');
+  btn.classList.toggle('active', isSideBySide);
+  btn.textContent = isSideBySide ? '✕ Single View' : '⟺ Side by Side';
+  if (configs.a) selectConfig(currentConfig, true);
+}
+
+function render3D(yourConfig) {
+  const pL = PALLET_CM.L * SCALE;
+  const pW = PALLET_CM.W * SCALE;
+  clearGroup(labelGroup);
+
+  if (isSideBySide) {
+    // ── Side-by-side layout ──
+    const gap3d = 1.8; // space between pallets
+    const yourX  = -(pL/2 + gap3d/2);
+    const tmX    =  (pL/2 + gap3d/2);
+
+    // Your pallet (wood, left)
+    drawPalletAt(palletGroup, yourX, 'wood');
+    renderBoxesIntoGroup(boxGroup, yourConfig, yourX, BOX_COLORS, palletGroup.userData.topY, true);
+
+    // TM config — exact 9 layers, no height cap
+    const compL  = parseFloat(document.getElementById('comp-l').value) || 41;
+    const compW  = parseFloat(document.getElementById('comp-w').value) || 35;
+    const compH  = parseFloat(document.getElementById('comp-h').value) || 22;
+    // Compute TM with enough height to fit 9 layers exactly
+    const tmNeededH = compH * 9 + 5; // 9 layers + headroom
+    const tmConfig = calcStandard(PALLET_CM.L, PALLET_CM.W, compL, compW, compH, tmNeededH);
+    // Force exactly 9 layers if that's TM's spec
+    tmConfig.layers = Math.min(tmConfig.layers, 9);
+    tmConfig.total  = tmConfig.perLayer * tmConfig.layers;
+    tmConfig.stackH = tmConfig.layers * compH;
+
+    // TM pallet (plastic, right)
+    drawPalletAt(tmPalletGroup, tmX, 'plastic');
+    renderBoxesIntoGroup(tmBoxGroup, tmConfig, tmX, TM_COLORS, tmPalletGroup.userData.topY, false);
+    tmBoxGroup.visible = true; tmPalletGroup.visible = true;
+
+    // Floating labels
+    const yourH = palletGroup.userData.topY + yourConfig.layers * yourConfig.boxH * SCALE + 0.7;
+    const tmH   = tmPalletGroup.userData.topY + tmConfig.layers * compH * SCALE + 0.7;
+    const compName = document.getElementById('comp-name').value.trim() || 'TM';
+    labelGroup.add(makeLabel('YOU', '#f5a623', yourX, yourH, 0));
+    labelGroup.add(makeLabel(compName, '#a5b4fc', tmX, tmH, 0));
+
+    // Camera — pull back to see both
+    const totalSpan = pL * 2 + gap3d;
+    const maxH = Math.max(yourH, tmH);
+    spherical.radius = Math.max(12, totalSpan * 2.0 + maxH * 1.1);
+    camera.userData.lookAtX = 0;
+    camera.userData.lookAtY = maxH * 0.5;
+    updateCamera();
+
+  } else {
+    // ── Single pallet (centered) ──
+    tmBoxGroup.visible = false; tmPalletGroup.visible = false;
+    drawPalletAt(palletGroup, 0, 'wood');
+    renderBoxesIntoGroup(boxGroup, yourConfig, 0, BOX_COLORS, palletGroup.userData.topY, true);
+
+    const totalH = palletGroup.userData.topY + yourConfig.layers * yourConfig.boxH * SCALE;
+    spherical.radius = Math.max(7, Math.max(pL, pW) * 2.6 + totalH * 1.2);
+    camera.userData.lookAtX = 0;
+    camera.userData.lookAtY = totalH * 0.5;
+    updateCamera();
+  }
+}
+
+// ═══════════════════════════════════════════
+// ORBIT
+// ═══════════════════════════════════════════
+function setupOrbit(canvas) {
+  canvas.addEventListener('mousedown', e => {
+    isDragging = true;
+    prevMouse = {x:e.clientX, y:e.clientY};
+  });
+  window.addEventListener('mouseup', () => isDragging = false);
+  window.addEventListener('mousemove', e => {
+    if(!isDragging) return;
+    const dx = e.clientX - prevMouse.x;
+    const dy = e.clientY - prevMouse.y;
+    spherical.theta -= dx * 0.006;
+    spherical.phi = Math.max(0.08, Math.min(Math.PI/2 - 0.05, spherical.phi - dy * 0.004));
+    prevMouse = {x:e.clientX, y:e.clientY};
+    updateCamera();
+  });
+  canvas.addEventListener('wheel', e => {
+    spherical.radius = Math.max(1.5, Math.min(120, spherical.radius + e.deltaY * 0.02));
+    updateCamera();
+    e.preventDefault();
+  }, {passive:false});
+  // Touch
+  let lastT = null;
+  canvas.addEventListener('touchstart', e => { isDragging=true; lastT={x:e.touches[0].clientX,y:e.touches[0].clientY}; });
+  canvas.addEventListener('touchend', () => isDragging=false);
+  canvas.addEventListener('touchmove', e => {
+    if(!isDragging||!lastT) return;
+    const dx = e.touches[0].clientX-lastT.x, dy = e.touches[0].clientY-lastT.y;
+    spherical.theta -= dx*0.006;
+    spherical.phi = Math.max(0.08, Math.min(Math.PI/2-0.05, spherical.phi-dy*0.004));
+    lastT = {x:e.touches[0].clientX,y:e.touches[0].clientY};
+    updateCamera(); e.preventDefault();
+  }, {passive:false});
+}
+
+function updateCamera() {
+  const {theta, phi, radius} = spherical;
+  const lookY = camera.userData.lookAtY ?? 1.5;
+  const lookX = camera.userData.lookAtX ?? 0;
+  // Orbit strictly around the lookAt point
+  camera.position.set(
+    lookX + radius * Math.sin(phi) * Math.sin(theta),
+    lookY + radius * Math.cos(phi),
+    radius * Math.sin(phi) * Math.cos(theta)
+  );
+  camera.lookAt(lookX, lookY, 0);
+}
+
+function onResize() {
+  const area = document.querySelector('.canvas-area');
+  const w = area.clientWidth, h = area.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+
+// ═══════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════
+window.addEventListener('load', () => {
+  initThree();
+  setTimeout(onResize, 50);
+  // Live title update
+  document.getElementById('sim-title').addEventListener('input', e => {
+    const overlay = document.getElementById('sim-title-overlay');
+    const v = e.target.value.trim();
+    if(v && document.getElementById('compare-bar').style.display !== 'none') {
+      overlay.textContent = v;
+      overlay.style.display = 'block';
+    } else {
+      overlay.style.display = 'none';
+    }
+  });
+});
+</script>
+</body>
+</html>
